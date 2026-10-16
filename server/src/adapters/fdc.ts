@@ -21,6 +21,13 @@ interface FdcNutrient {
   nutrient?: { id: number };
 }
 
+interface FdcFood {
+  fdcId: number;
+  description: string;
+  dataType: string;
+  foodNutrients?: FdcNutrient[];
+}
+
 interface FdcPortion {
   gramWeight?: number;
   amount?: number;
@@ -73,14 +80,16 @@ export function toPortion(p: FdcPortion): Portion | undefined {
   if (desc) return { description: desc, gramWeight: p.gramWeight, amount: leadingNumber(desc) ?? 1 };
   const unit = p.measureUnit?.name && p.measureUnit.name !== "undetermined" ? p.measureUnit.name : "";
   const amount = p.amount ?? 1;
-  const description = [amount, unit, p.modifier ?? ""].join(" ").replace(/\s+/g, " ").trim();
+  // FNDDS uses numeric codes such as "90000" as the modifier for "quantity not specified".
+  const modifier = p.modifier && !/^\d+$/.test(p.modifier) ? p.modifier : unit ? "" : "serving";
+  const description = [amount, unit, modifier].join(" ").replace(/\s+/g, " ").trim();
   return { description, gramWeight: p.gramWeight, amount };
 }
 
 /** USDA FoodData Central client with in-process caching. */
 export class FdcNutritionSource implements NutritionSource {
   private readonly searchCache = new TtlCache<FoodCandidate[]>(24 * 3600_000);
-  private readonly portionCache = new TtlCache<Portion[]>(24 * 3600_000);
+  private readonly detailCache = new TtlCache<{ food: FoodCandidate; portions: Portion[] }>(24 * 3600_000);
 
   constructor(private readonly apiKey: string, private readonly fetchImpl: typeof fetch = fetch) {}
 
@@ -88,14 +97,10 @@ export class FdcNutritionSource implements NutritionSource {
     const key = query.trim().toLowerCase();
     const cached = this.searchCache.get(key);
     if (cached) return cached;
-    const res = await this.fetchImpl(`${BASE}/foods/search?api_key=${encodeURIComponent(this.apiKey)}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ query: key, dataType: DATA_TYPES, pageSize: 10 }),
-    });
-    if (!res.ok) throw new Error(`FDC search failed with status ${res.status}`);
-    const body = (await res.json()) as { foods?: { fdcId: number; description: string; dataType: string; foodNutrients?: FdcNutrient[] }[] };
-    const foods = (body.foods ?? []).map((x) => ({
+    // Require every word first for precision; fall back to any-word matching when that finds nothing.
+    let raw = await this.searchOnce(key, true);
+    if (raw.length === 0) raw = await this.searchOnce(key, false);
+    const foods = raw.map((x) => ({
       fdcId: x.fdcId,
       description: x.description,
       dataType: x.dataType,
@@ -106,15 +111,39 @@ export class FdcNutritionSource implements NutritionSource {
     return foods;
   }
 
+  private async searchOnce(query: string, requireAllWords: boolean): Promise<FdcFood[]> {
+    const res = await this.fetchImpl(`${BASE}/foods/search?api_key=${encodeURIComponent(this.apiKey)}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ query, dataType: DATA_TYPES, pageSize: 25, requireAllWords }),
+    });
+    if (!res.ok) throw new Error(`FDC search failed with status ${res.status}`);
+    const body = (await res.json()) as { foods?: FdcFood[] };
+    return body.foods ?? [];
+  }
+
   async portions(fdcId: number): Promise<Portion[]> {
+    return (await this.details(fdcId))?.portions ?? [];
+  }
+
+  async food(fdcId: number): Promise<FoodCandidate | undefined> {
+    return (await this.details(fdcId))?.food;
+  }
+
+  /** One /food/{id} call gives both nutrients and portions; cache them together. */
+  private async details(fdcId: number): Promise<{ food: FoodCandidate; portions: Portion[] } | undefined> {
     const key = String(fdcId);
-    const cached = this.portionCache.get(key);
+    const cached = this.detailCache.get(key);
     if (cached) return cached;
     const res = await this.fetchImpl(`${BASE}/food/${fdcId}?api_key=${encodeURIComponent(this.apiKey)}`);
+    if (res.status === 404) return undefined;
     if (!res.ok) throw new Error(`FDC food lookup failed with status ${res.status}`);
-    const body = (await res.json()) as { foodPortions?: FdcPortion[] };
-    const portions = (body.foodPortions ?? []).map(toPortion).filter((p): p is Portion => p !== undefined);
-    this.portionCache.set(key, portions);
-    return portions;
+    const body = (await res.json()) as FdcFood & { foodPortions?: FdcPortion[] };
+    const value = {
+      food: { fdcId: body.fdcId, description: body.description, dataType: body.dataType, per100g: extractNutrients(body.foodNutrients ?? []) },
+      portions: (body.foodPortions ?? []).map(toPortion).filter((p): p is Portion => p !== undefined),
+    };
+    this.detailCache.set(key, value);
+    return value;
   }
 }

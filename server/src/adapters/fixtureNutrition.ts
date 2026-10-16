@@ -78,6 +78,11 @@ export class FixtureNutritionSource implements NutritionSource {
       .map(({ food: { fdcId, description, dataType, per100g } }) => ({ fdcId, description, dataType, per100g }));
   }
 
+  async food(fdcId: number): Promise<FoodCandidate | undefined> {
+    const f = this.foods.find((x) => x.fdcId === fdcId);
+    return f && { fdcId: f.fdcId, description: f.description, dataType: f.dataType, per100g: f.per100g };
+  }
+
   async portions(fdcId: number): Promise<Portion[]> {
     return this.foods.find((x) => x.fdcId === fdcId)?.portions ?? [];
   }

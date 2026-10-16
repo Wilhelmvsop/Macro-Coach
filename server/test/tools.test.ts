@@ -162,7 +162,7 @@ describe("search_food", () => {
   it("answers with a typical serving", async () => {
     const r = await h.searchFood(ctx, { query: "Greek yogurt" });
     expect(r.data).toMatchObject({ fdc_id: 900007, grams: 170, nutrients: { protein: 17.3, calories: 100 } });
-    expect(r.speech).toBe("One container of greek yogurt, about 170 grams, has 17 grams of protein, 6 grams of carbs, 1 gram of fat and 100 calories.");
+    expect(r.speech).toBe("A typical serving of greek yogurt, about 170 grams, has 17 grams of protein, 6 grams of carbs, 1 gram of fat and 100 calories.");
   });
   it("uses an explicit quantity", async () => {
     const r = await h.searchFood(ctx, { query: "white rice", quantity: 2, unit: "cups" });

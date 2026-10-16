@@ -37,6 +37,8 @@ export interface Portion {
 export interface NutritionSource {
   search(query: string): Promise<FoodCandidate[]>;
   portions(fdcId: number): Promise<Portion[]>;
+  /** A single food by FDC ID, used for curated defaults of common foods. */
+  food(fdcId: number): Promise<FoodCandidate | undefined>;
 }
 
 export interface ParsedItem {

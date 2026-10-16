@@ -57,7 +57,7 @@ export class RuleLlm implements Llm {
       const carb = ing.filter((i) => CARBS.some((c) => i.includes(c)));
       const veg = ing.filter((i) => !protein.includes(i) && !carb.includes(i));
       // Size the protein portion to cover roughly the remaining protein, within sensible limits.
-      const proteinGrams = Math.min(250, Math.max(100, Math.round((req.remaining.protein / 0.28) / 10) * 10));
+      const proteinGrams = Math.min(200, Math.max(100, Math.round((req.remaining.protein / 0.28) / 10) * 10));
       const carbGrams = req.remaining.carbs > 40 ? 180 : 100;
       ideas.push({
         name: `${ing.map((i) => i.replace(/^\w/, (c) => c.toUpperCase())).join(", ")} plate`,

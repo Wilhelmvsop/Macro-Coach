@@ -45,8 +45,18 @@ export function isMassUnit(unit: string): boolean {
 /** Words in a portion description that mean "one of the thing itself". */
 const COUNT_HINTS = ["medium", "large", "whole", "piece", "item", "each", "egg", "fruit", "small", "regular", "nlea serving"];
 
+/** Spellings FDC uses for the same unit, e.g. FNDDS writes "1 tablespoon" where SR Legacy writes "1 tbsp". */
+const SPELLINGS: Record<string, string[]> = {
+  tbsp: ["tbsp", "tablespoon"],
+  tsp: ["tsp", "teaspoon"],
+  oz: ["oz", "ounce"],
+  "fl oz": ["fl oz", "fluid ounce"],
+  // FNDDS calls a slice of pizza or cake "1 piece".
+  slice: ["slice", "piece"],
+};
+
 function describes(p: Portion, word: string): boolean {
-  return new RegExp(`\\b${word.replace(/ /g, "\\s")}s?\\b`, "i").test(p.description);
+  return (SPELLINGS[word] ?? [word]).some((w) => new RegExp(`\\b${w.replace(/ /g, "\\s")}s?\\b`, "i").test(p.description));
 }
 
 /** Portion descriptions that are a volume or mass measure, not a count. */
@@ -58,8 +68,14 @@ function isMeasure(p: Portion): boolean {
  * Grams for one `unit` of a food, using the food's portion list.
  * Returns undefined when we cannot determine a weight without guessing.
  */
-export function gramsPerUnit(unit: string, portions: Portion[]): number | undefined {
+export function gramsPerUnit(unit: string, allPortions: Portion[], food?: string): number | undefined {
   if (isMassUnit(unit)) return MASS[unit];
+
+  // Skip dry-measure and guideline portions ("1 cup, dry, yields"), and try plain sizes before
+  // unusual ones ("1 slice" before "1 slice, snack-size").
+  const usable = allPortions.filter((p) => !/\bdry\b|yields|guideline/i.test(p.description));
+  const odd = (p: Portion) => (/snack|small|thin|mini|cocktail|kids/i.test(p.description) ? 1 : 0);
+  const portions = [...usable].sort((x, y) => odd(x) - odd(y));
 
   const per = (p: Portion) => p.gramWeight / (p.amount > 0 ? p.amount : 1);
 
@@ -81,6 +97,10 @@ export function gramsPerUnit(unit: string, portions: Portion[]): number | undefi
   }
 
   if (unit === "" || unit === "piece" || unit === "serving") {
+    // "1 banana" or "1 egg" is the most direct answer to "a banana".
+    const noun = food?.toLowerCase().split(/\s+/).pop()?.replace(/s$/, "");
+    const named = noun ? portions.find((p) => describes(p, noun) && !isMeasure(p)) : undefined;
+    if (named) return per(named);
     for (const hint of ["medium", "large", ...COUNT_HINTS]) {
       const match = portions.find((p) => describes(p, hint) && !isMeasure(p));
       if (match) return per(match);

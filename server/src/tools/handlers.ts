@@ -6,7 +6,7 @@ import { coachingHint, dailySummary, weeklyReport, type DailySummary } from "../
 import { MEAL_TYPES, type Goals, type LogEntry, type MealType, type Profile, type User } from "../domain/types.js";
 import type { Deps } from "../ports.js";
 import { gramsPerUnit, normalizeUnit } from "../parsing/units.js";
-import { pickCandidate, resolveItem, type ResolvedItem } from "../services/resolver.js";
+import { findFood, resolveItem, type ResolvedItem } from "../services/resolver.js";
 import { UserFacingError } from "./errors.js";
 import { amount, grams, list, num } from "./speech.js";
 
@@ -184,7 +184,7 @@ export async function editLogEntry(ctx: ToolContext, input: z.infer<typeof editL
   let unit = entry.unit;
   if (input.unit !== undefined && normalizeUnit(input.unit) !== entry.unit) {
     unit = normalizeUnit(input.unit);
-    const g = gramsPerUnit(unit, await deps.nutrition.portions(entry.fdcId));
+    const g = gramsPerUnit(unit, await deps.nutrition.portions(entry.fdcId), entry.spokenName);
     if (g === undefined) throw new UserFacingError(`I don't know how much one ${unit} of ${entry.spokenName} weighs. Try grams or ounces.`);
     gpu = g;
   }
@@ -266,7 +266,7 @@ export async function suggestMeal(ctx: ToolContext, input: z.infer<typeof sugges
   for (const d of drafts) {
     const ingredients = [];
     for (const ing of d.ingredients) {
-      const food = pickCandidate(ing.searchQuery, await deps.nutrition.search(ing.searchQuery));
+      const food = (await findFood(deps.nutrition, ing.food)) ?? (await findFood(deps.nutrition, ing.searchQuery));
       if (!food) continue;
       ingredients.push({ food: ing.food, fdc_id: food.fdcId, fdc_description: food.description, grams: Math.round(ing.grams), nutrients: round(scale(food.per100g, ing.grams)) });
     }
@@ -387,7 +387,7 @@ export const searchFoodInput = z
 
 export async function searchFood(ctx: ToolContext, input: z.infer<typeof searchFoodInput>): Promise<ToolResult> {
   const { nutrition } = ctx.deps;
-  const food = pickCandidate(input.query, await nutrition.search(input.query));
+  const food = await findFood(nutrition, input.query);
   if (!food) throw new UserFacingError(`I couldn't find ${input.query} in the USDA database.`);
   const portions = await nutrition.portions(food.fdcId);
 
@@ -395,14 +395,14 @@ export async function searchFood(ctx: ToolContext, input: z.infer<typeof searchF
   let g: number;
   if (input.quantity !== undefined) {
     const unit = normalizeUnit(input.unit);
-    const gpu = gramsPerUnit(unit, portions);
+    const gpu = gramsPerUnit(unit, portions, input.query);
     if (gpu === undefined) throw new UserFacingError(`I don't know how much one ${unit || "serving"} of ${input.query} weighs. Try grams or cups.`);
     g = gpu * input.quantity;
     label = amount(input.quantity, unit, input.query.toLowerCase());
   } else if (portions[0]) {
     const p = portions[0];
     g = p.gramWeight;
-    label = `${p.description} of ${input.query.toLowerCase()}`;
+    label = `a typical serving of ${input.query.toLowerCase()}`;
   } else {
     g = 100;
     label = `100 grams of ${input.query.toLowerCase()}`;

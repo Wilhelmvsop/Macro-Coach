@@ -16,8 +16,8 @@ const WEEK: DayPlan[] = [
   [["breakfast", "08:00", "two scrambled eggs and 1 slice whole wheat bread"], ["lunch", "13:00", "1 cup pasta and 3 oz ground beef and 1 slice cheddar cheese"], ["dinner", "19:30", "3 slices pizza"], ["snack", "21:00", "1 oz almonds and 1 cup milk"]],
   [["breakfast", "07:15", "1 container greek yogurt and 1 cup blueberries"], ["lunch", "12:15", "1 chicken breast and 1 cup broccoli and 1 cup white rice"], ["dinner", "18:45", "1 cup tofu and 1 cup black beans and 1 cup white rice and 1 tbsp olive oil"]],
   [["breakfast", "09:00", "2 slices whole wheat bread and 2 tbsp peanut butter"], ["lunch", "14:00", "1 cup salad greens and 1 slice cheddar cheese"], ["dinner", "20:30", "2 slices pizza and 1 cup milk"], ["snack", "22:00", "1 oz almonds"]],
-  [["breakfast", "07:30", "three scrambled eggs and a banana"], ["lunch", "12:30", "1 chicken breast and 1 cup white rice and 1 cup broccoli"], ["dinner", "19:00", "1 salmon fillet and 1 cup spinach and 1 medium sweet potato and 1 tbsp olive oil"], ["snack", "15:30", "1 scoop whey protein and 1 apple"]],
-  [["breakfast", "08:00", "1 cup oatmeal and 1 scoop whey protein"], ["lunch", "12:45", "1 cup pasta and 1 chicken breast"], ["dinner", "19:15", "3 oz ground beef and 1 cup black beans and 1 avocado"], ["snack", "16:00", "1 apple and 1 tbsp peanut butter"]],
+  [["breakfast", "07:30", "three scrambled eggs and a banana"], ["lunch", "12:30", "1 chicken breast and 1 cup white rice and 1 cup broccoli"], ["dinner", "19:00", "1 salmon fillet and 1 cup spinach and 1 medium sweet potato and 1 tbsp olive oil"], ["snack", "15:30", "30 g whey protein and 1 apple"]],
+  [["breakfast", "08:00", "1 cup oatmeal and 30 g whey protein"], ["lunch", "12:45", "1 cup pasta and 1 chicken breast"], ["dinner", "19:15", "3 oz ground beef and 1 cup black beans and 1 avocado"], ["snack", "16:00", "1 apple and 1 tbsp peanut butter"]],
 ];
 
 /** Converts a local date and HH:MM in a timezone to an ISO instant. */
