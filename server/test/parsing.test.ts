@@ -118,3 +118,17 @@ describe("gramsPerUnit", () => {
     expect(gramsPerUnit("slice", portions)).toBeUndefined();
   });
 });
+
+describe("spoken amounts", async () => {
+  const { amount } = await import("../src/tools/speech.js");
+  it.each([
+    [3, "oz", "ground beef", "3 ounces of ground beef"],
+    [2, "tbsp", "peanut butter", "2 tablespoons of peanut butter"],
+    [1, "cup", "rice", "1 cup of rice"],
+    [2, "", "scrambled egg", "2 scrambled eggs"],
+    [0.5, "cup", "oatmeal", "half a cup of oatmeal"],
+    [150, "g", "chicken", "150 grams of chicken"],
+  ])("%s %s %s", (q, u, f, expected) => {
+    expect(amount(q as number, u as string, f as string)).toBe(expected);
+  });
+});

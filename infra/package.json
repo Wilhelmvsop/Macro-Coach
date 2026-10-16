@@ -16,7 +16,7 @@
   },
   "scripts": {
     "synth": "cdk synth",
-    "deploy": "cdk bootstrap && cdk deploy --require-approval never --outputs-file cdk-outputs.json",
+    "deploy": "pnpm --dir ../simulator build && cdk bootstrap && cdk deploy --require-approval never --outputs-file cdk-outputs.json",
     "destroy": "cdk destroy",
     "typecheck": "tsc --noEmit",
     "lint": "tsc --noEmit",

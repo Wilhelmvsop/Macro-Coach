@@ -27,5 +27,18 @@ export function amount(quantity: number, unit: string, food: string): string {
   if (!unit) return `${qty(quantity)} ${plural && !/s$/.test(food) ? `${food}s` : food}`;
   if (unit === "g") return `${num(quantity)} grams of ${food}`;
   if (unit === "small" || unit === "medium" || unit === "large") return `${qty(quantity)} ${unit} ${food}${plural ? "s" : ""}`;
-  return `${qty(quantity)} ${unit}${plural && !/s$/.test(unit) ? "s" : ""} of ${food}`;
+  const word = SPOKEN_UNITS[unit] ?? unit;
+  return `${qty(quantity)} ${word}${plural && !/s$/.test(word) ? (/(ch|sh|x)$/.test(word) ? "es" : "s") : ""} of ${food}`;
 }
+
+/** Abbreviations read out as words, so text-to-speech says "ounces", not "ozs". */
+const SPOKEN_UNITS: Record<string, string> = {
+  oz: "ounce",
+  lb: "pound",
+  kg: "kilogram",
+  ml: "milliliter",
+  l: "liter",
+  tbsp: "tablespoon",
+  tsp: "teaspoon",
+  "fl oz": "fluid ounce",
+};
