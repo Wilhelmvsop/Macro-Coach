@@ -43,6 +43,12 @@ describe("log_meal", () => {
     expect(await ctx.deps.store.recentEntries("u1", 10)).toHaveLength(0);
   });
 
+  it("never logs a vague description", async () => {
+    const r = await h.logMeal(ctx, { description: "I had some food" });
+    expect(r.data).toMatchObject({ logged: false, needs_clarification: true });
+    expect(await ctx.deps.store.recentEntries("u1", 10)).toHaveLength(0);
+  });
+
   it("asks when the food is not found", async () => {
     const r = await h.logMeal(ctx, { description: "a dragonfruit smoothie" });
     expect(r.data.needs_clarification).toBe(true);

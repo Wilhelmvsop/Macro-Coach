@@ -101,6 +101,9 @@ export async function findFood(nutrition: NutritionSource, query: string): Promi
   return pickCandidate(query, await nutrition.search(query));
 }
 
+/** Words too vague to look up; logging them would mean inventing numbers. */
+const VAGUE = new Set(["food", "something", "stuff", "thing", "meal", "snack", "breakfast", "lunch", "dinner", "bite", "leftover", "junk"]);
+
 /** Picks the best candidate; ties keep FDC's own ranking. */
 export function pickCandidate(query: string, candidates: FoodCandidate[]): FoodCandidate | undefined {
   let best: FoodCandidate | undefined;
@@ -124,6 +127,9 @@ function describeAmount(item: ParsedItem): string {
  * if neither the unit nor the food's portion data gives grams, asks a question.
  */
 export async function resolveItem(nutrition: NutritionSource, item: ParsedItem): Promise<Resolution> {
+  if (words(item.food).every((w) => VAGUE.has(w))) {
+    return { ok: false, question: "What exactly did you eat? Tell me the food and roughly how much." };
+  }
   const food = (await findFood(nutrition, item.food)) ?? (await findFood(nutrition, item.searchQuery));
   if (!food) {
     return { ok: false, question: `I couldn't find ${item.food} in the nutrition database. Could you describe it differently?` };
