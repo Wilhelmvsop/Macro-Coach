@@ -8,3 +8,4 @@ coverage/
 *.log
 .DS_Store
 .fdc-cache/
+cdk-outputs.json

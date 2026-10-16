@@ -6,10 +6,12 @@ import { errorFields, log } from "../logger.js";
 import { SERVER_INFO, createMcpServer } from "../mcp/server.js";
 import type { Deps } from "../ports.js";
 import type { User } from "../domain/types.js";
+import { AgentLlmRequest, type AgentLlm } from "./agentLlm.js";
 
 export interface AppOptions {
   host?: string;
   allowedHosts?: string[];
+  agentLlm?: AgentLlm;
 }
 
 function jsonRpcError(res: Response, status: number, message: string): void {
@@ -79,6 +81,29 @@ export function createApp(deps: Deps, opts: AppOptions = {}): Express {
     } catch (err) {
       log.error("mcp.request.error", errorFields(err));
       if (!res.headersSent) jsonRpcError(res, 500, "Internal server error");
+    }
+  });
+
+  // One LLM turn for the simulator's in-browser agent loop. The browser is the MCP
+  // client; this endpoint only proxies Bedrock so no AWS credentials reach the browser.
+  app.post("/agent/converse", auth, async (req: Request, res: Response) => {
+    if (!opts.agentLlm) {
+      res.status(503).json({ error: "The simulator assistant is not configured on this server." });
+      return;
+    }
+    const parsed = AgentLlmRequest.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: "Invalid request" });
+      return;
+    }
+    const started = Date.now();
+    try {
+      const out = await opts.agentLlm.converse(parsed.data);
+      log.info("agent.converse", { userId: (res.locals.user as User).id, ms: Date.now() - started, stopReason: out.stopReason });
+      res.json(out);
+    } catch (err) {
+      log.error("agent.converse.error", errorFields(err));
+      res.status(502).json({ error: "The assistant is unavailable right now. Please try again." });
     }
   });
 

@@ -5,6 +5,8 @@ import { FdcNutritionSource } from "./adapters/fdc.js";
 import { FixtureNutritionSource } from "./adapters/fixtureNutrition.js";
 import { MemoryStore } from "./adapters/memoryStore.js";
 import { RuleLlm } from "./adapters/ruleLlm.js";
+import { BedrockAgentLlm } from "./http/agentLlm.js";
+import type { AppOptions } from "./http/app.js";
 import { log } from "./logger.js";
 import type { Deps } from "./ports.js";
 
@@ -43,4 +45,12 @@ export function buildDeps(cfg: Config): Deps {
     llm: cfg.useBedrock ? `bedrock:${cfg.bedrockModelId}` : "rules",
   });
   return { store, nutrition, llm, now: () => new Date(), newId: () => randomUUID() };
+}
+
+export function appOptions(cfg: Config): AppOptions {
+  return {
+    host: cfg.host,
+    ...(cfg.allowedHosts ? { allowedHosts: cfg.allowedHosts } : {}),
+    ...(cfg.useBedrock ? { agentLlm: new BedrockAgentLlm(cfg.bedrockModelId, cfg.awsRegion) } : {}),
+  };
 }
