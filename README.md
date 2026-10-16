@@ -78,13 +78,47 @@ pnpm typecheck
 
 The integration test starts the HTTP server on a random port, connects with the SDK's `StreamableHTTPClientTransport`, and calls every tool, the resource and the prompt.
 
-## Deploy
-
-Coming with the AWS CDK app in `/infra` (milestone: Oct 18).
-
 ## How judges can test it
 
-Public URL, token and sample utterances will be listed here after deployment.
+| What | Value |
+|---|---|
+| Simulator (web, voice or text) | https://d27lym254gcbg5.cloudfront.net |
+| MCP endpoint (Streamable HTTP) | `https://igg6lly82j.execute-api.us-east-1.amazonaws.com/mcp` |
+| Health check | https://igg6lly82j.execute-api.us-east-1.amazonaws.com/health |
+| Auth header | `Authorization: Bearer demo-judge-token` |
+
+The demo user has a week of history that is re-seeded every night, so the weekly report always has data. Try these, in order:
+
+1. "I had two scrambled eggs and a banana for breakfast."
+2. "How much protein do I still need today?"
+3. "Actually make that one egg, not two."
+4. "What should I eat for dinner? I have chicken, rice and broccoli."
+5. "How did I do this week?"
+6. "I'm trying to cut. Set my goal to 2,000 calories and 150 grams of protein."
+
+To use your own MCP client (for example MCP Inspector), choose transport "Streamable HTTP", paste the MCP endpoint and add the auth header.
+
+## Deploy
+
+Requirements: an AWS account with credentials configured (`aws configure`), Bedrock access to a Claude model, and a FoodData Central API key.
+
+```bash
+cp server/.env.example server/.env   # set FDC_API_KEY; optionally BEDROCK_MODEL_ID and DEMO_TOKEN
+pnpm install
+pnpm run deploy                      # builds the simulator, bootstraps CDK and deploys everything
+```
+
+The stack outputs the MCP URL, health URL and simulator URL. It creates a DynamoDB table, two Lambda functions (MCP server and seeder), an API Gateway HTTP API, an S3 bucket with a CloudFront distribution for the simulator, and an EventBridge rule that re-seeds the demo user nightly. Remove it with `pnpm --filter @macro-coach/infra destroy`.
+
+### Hosting choice
+
+The MCP server runs on AWS Lambda behind an API Gateway HTTP API. The Streamable HTTP transport runs in stateless mode with JSON responses (`sessionIdGenerator: undefined`, `enableJsonResponse: true`): every POST builds a fresh `McpServer` and returns a single JSON-RPC response, which the spec allows. We don't need Lambda response streaming or sticky sessions, so this is reliable and scales to zero, and it stays free for judges. `GET /mcp` returns 405 because there is no standalone server-to-client stream.
+
+### Deviations from the original plan
+
+- `pnpm deploy` is a built-in pnpm command, so the deploy script is `pnpm run deploy`.
+- The simulator's agent loop runs in the browser as a real MCP client. Only the Bedrock call goes through a small authenticated endpoint on the server (`POST /agent/converse`), so no AWS credentials reach the browser. If Bedrock is unavailable, the simulator switches to a local intent router and still calls the same MCP tools.
+- The FDC API key is passed to Lambda as an environment variable set at deploy time. It is never committed.
 
 ## License
 
