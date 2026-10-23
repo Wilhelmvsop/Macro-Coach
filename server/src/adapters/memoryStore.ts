@@ -14,6 +14,10 @@ export class MemoryStore implements Store {
     return id ? this.users.get(id) : undefined;
   }
 
+  async getUser(userId: string): Promise<User | undefined> {
+    return this.users.get(userId);
+  }
+
   async putUser(user: User, token: string): Promise<void> {
     this.users.set(user.id, user);
     this.tokens.set(token, user.id);

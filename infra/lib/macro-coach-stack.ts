@@ -26,6 +26,8 @@ export interface MacroCoachStackProps extends StackProps {
   fdcApiKey: string;
   demoToken: string;
   bedrockModelIds: string;
+  /** OAuth 2.1 settings for Alexa+ account linking; OAuth is off when signingSecret is empty. */
+  oauth: { signingSecret?: string; clientId?: string; clientSecret?: string };
 }
 
 export class MacroCoachStack extends Stack {
@@ -53,6 +55,9 @@ export class MacroCoachStack extends Stack {
         TABLE_NAME: table.tableName,
         FDC_API_KEY: props.fdcApiKey,
         BEDROCK_MODEL_IDS: props.bedrockModelIds,
+        ...(props.oauth.signingSecret ? { OAUTH_SIGNING_SECRET: props.oauth.signingSecret } : {}),
+        ...(props.oauth.clientId ? { OAUTH_CLIENT_ID: props.oauth.clientId } : {}),
+        ...(props.oauth.clientSecret ? { OAUTH_CLIENT_SECRET: props.oauth.clientSecret } : {}),
         DEMO_TOKEN: props.demoToken,
         NODE_OPTIONS: "--enable-source-maps",
       },
@@ -96,6 +101,9 @@ export class MacroCoachStack extends Stack {
     httpApi.addRoutes({ path: "/mcp", methods: [HttpMethod.GET, HttpMethod.POST, HttpMethod.DELETE], integration });
     httpApi.addRoutes({ path: "/health", methods: [HttpMethod.GET], integration });
     httpApi.addRoutes({ path: "/agent/converse", methods: [HttpMethod.POST], integration });
+    // OAuth 2.1 discovery and endpoints for Alexa+ account linking.
+    httpApi.addRoutes({ path: "/.well-known/{proxy+}", methods: [HttpMethod.GET], integration });
+    httpApi.addRoutes({ path: "/oauth/{proxy+}", methods: [HttpMethod.GET, HttpMethod.POST], integration });
 
     // Seed the judge user on every deploy, then refresh nightly so the demo week stays current.
     const seed = new NodejsFunction(this, "SeedFunction", {

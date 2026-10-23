@@ -7,11 +7,14 @@ import { SERVER_INFO, createMcpServer } from "../mcp/server.js";
 import type { Deps } from "../ports.js";
 import type { User } from "../domain/types.js";
 import { AgentLlmRequest, type AgentLlm } from "./agentLlm.js";
+import { mountOAuth, resolveBearer, type OAuthOptions } from "./oauth.js";
 
 export interface AppOptions {
   host?: string;
   allowedHosts?: string[];
   agentLlm?: AgentLlm;
+  /** Enables OAuth 2.1 account linking (Alexa+ MCP Toolkit). Static API keys keep working. */
+  oauth?: OAuthOptions;
 }
 
 function jsonRpcError(res: Response, status: number, message: string): void {
@@ -44,19 +47,21 @@ export function createApp(deps: Deps, opts: AppOptions = {}): Express {
     res.json({ ok: true, server: SERVER_INFO, protocolVersion: LATEST_PROTOCOL_VERSION });
   });
 
+  if (opts.oauth) mountOAuth(app, deps.store, opts.oauth);
+
+  // 401s carry no WWW-Authenticate header: the Alexa+ MCP Toolkit requires that and
+  // discovers auth through /.well-known/oauth-protected-resource instead.
   const auth = async (req: Request, res: Response, next: NextFunction) => {
     const header = req.header("authorization") ?? "";
     const token = /^Bearer\s+(.+)$/i.exec(header)?.[1]?.trim();
     if (!token) {
-      res.setHeader("WWW-Authenticate", 'Bearer realm="macro-coach"');
       jsonRpcError(res, 401, "Missing bearer token");
       return;
     }
     try {
-      const user = await deps.store.getUserByToken(token);
+      const user = await resolveBearer(deps.store, opts.oauth, token);
       if (!user) {
-        res.setHeader("WWW-Authenticate", 'Bearer realm="macro-coach", error="invalid_token"');
-        jsonRpcError(res, 401, "Invalid bearer token");
+        jsonRpcError(res, 401, "Invalid or expired bearer token");
         return;
       }
       res.locals.user = user;

@@ -14,5 +14,10 @@ new MacroCoachStack(app, "MacroCoach", {
   env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.AWS_REGION ?? process.env.CDK_DEFAULT_REGION ?? "us-east-1" },
   fdcApiKey,
   demoToken: process.env.DEMO_TOKEN ?? "demo-judge-token",
+  oauth: {
+    signingSecret: process.env.OAUTH_SIGNING_SECRET,
+    clientId: process.env.OAUTH_CLIENT_ID,
+    clientSecret: process.env.OAUTH_CLIENT_SECRET,
+  },
   bedrockModelIds: process.env.BEDROCK_MODEL_IDS ?? process.env.BEDROCK_MODEL_ID ?? "us.anthropic.claude-sonnet-4-6,us.amazon.nova-pro-v1:0",
 });

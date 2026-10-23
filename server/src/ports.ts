@@ -3,6 +3,7 @@ import type { Goals, LogEntry, MealType, Nutrients, Profile, User } from "./doma
 /** Persistence. Implemented by the in-memory adapter (dev/tests) and DynamoDB (prod). */
 export interface Store {
   getUserByToken(token: string): Promise<User | undefined>;
+  getUser(userId: string): Promise<User | undefined>;
   putUser(user: User, token: string): Promise<void>;
   getGoals(userId: string): Promise<Goals | undefined>;
   putGoals(userId: string, goals: Goals): Promise<void>;

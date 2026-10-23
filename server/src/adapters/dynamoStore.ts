@@ -37,6 +37,11 @@ export class DynamoStore implements Store {
     return u.Item?.user as User | undefined;
   }
 
+  async getUser(userId: string): Promise<User | undefined> {
+    const u = await this.doc.send(new GetCommand({ TableName: this.table, Key: { PK: userPk(userId), SK: "USER" } }));
+    return u.Item?.user as User | undefined;
+  }
+
   async putUser(user: User, token: string): Promise<void> {
     await this.doc.send(new PutCommand({ TableName: this.table, Item: { PK: userPk(user.id), SK: "USER", user } }));
     await this.doc.send(new PutCommand({ TableName: this.table, Item: { PK: `TOKEN#${hashToken(token)}`, SK: "TOKEN", userId: user.id } }));

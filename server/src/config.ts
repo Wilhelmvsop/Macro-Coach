@@ -8,6 +8,7 @@ import { MemoryStore } from "./adapters/memoryStore.js";
 import { RuleLlm } from "./adapters/ruleLlm.js";
 import { BedrockAgentLlm } from "./http/agentLlm.js";
 import type { AppOptions } from "./http/app.js";
+import { oauthFromEnv } from "./http/oauth.js";
 import { log } from "./logger.js";
 import type { Deps } from "./ports.js";
 
@@ -52,8 +53,10 @@ export function buildDeps(cfg: Config): Deps {
   return { store, nutrition, llm, now: () => new Date(), newId: () => randomUUID() };
 }
 
-export function appOptions(cfg: Config): AppOptions {
+export function appOptions(cfg: Config, env: NodeJS.ProcessEnv = process.env): AppOptions {
+  const oauth = oauthFromEnv(env);
   return {
+    ...(oauth ? { oauth } : {}),
     host: cfg.host,
     ...(cfg.allowedHosts ? { allowedHosts: cfg.allowedHosts } : {}),
     ...(cfg.useBedrock ? { agentLlm: new BedrockAgentLlm(cfg.bedrockModelIds, cfg.awsRegion) } : {}),
