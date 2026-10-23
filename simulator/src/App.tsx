@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Agent, type ToolTrace } from "./agent";
+import { AppFrame } from "./components/AppFrame";
 import { Rings, type TodaySummary } from "./components/Rings";
 import { TrafficPanel } from "./components/TrafficPanel";
 import { TrendChart, type WeekDay } from "./components/TrendChart";
@@ -16,7 +17,11 @@ interface Turn {
   id: string;
   who: "user" | "assistant";
   text: string;
+  /** MCP Apps card returned with this reply. */
+  card?: { html: string; result: unknown; tool: string };
 }
+
+const STEPS = ["You speak", "Bedrock agent picks a tool", "MCP over Streamable HTTP", "USDA FoodData Central", "DynamoDB"];
 
 const SAMPLES = [
   "I had two scrambled eggs and a banana for breakfast.",
@@ -58,6 +63,7 @@ export function App() {
   const [listening, setListening] = useState(false);
   const [voiceOut, setVoiceOut] = useState(true);
   const [mode, setMode] = useState<"bedrock" | "local">("bedrock");
+  const [model, setModel] = useState<string>();
   const mcp = useRef<McpConnection>();
   const agent = useRef<Agent>();
   const listener = useRef<Listener>();
@@ -116,12 +122,21 @@ export function App() {
       setBusy(true);
       setDraft("");
       setTurns((t) => [...t, { id: crypto.randomUUID(), who: "user", text: clean }]);
+      const done: ToolTrace[] = [];
       const reply = await a.ask(clean, {
         onToolStart: (tr) => setTraces((list) => [tr, ...list]),
-        onToolEnd: (tr) => setTraces((list) => list.map((x) => (x.id === tr.id ? tr : x))),
+        onToolEnd: (tr) => {
+          done.push(tr);
+          setTraces((list) => list.map((x) => (x.id === tr.id ? tr : x)));
+        },
       });
       setMode(a.mode);
-      setTurns((t) => [...t, { id: crypto.randomUUID(), who: "assistant", text: reply }]);
+      setModel(a.model);
+      // Show the MCP Apps card for the last tool that has one.
+      const withUi = [...done].reverse().find((t) => t.ui && t.status === "ok");
+      const html = withUi?.ui ? await mcp.current?.readUi(withUi.ui).catch(() => undefined) : undefined;
+      const card = withUi && html ? { html, result: withUi.raw, tool: withUi.name } : undefined;
+      setTurns((t) => [...t, { id: crypto.randomUUID(), who: "assistant", text: reply, ...(card ? { card } : {}) }]);
       speak(reply, voiceOut);
       setBusy(false);
       void refreshDashboard();
@@ -162,15 +177,28 @@ export function App() {
           <span className="logo" aria-hidden="true" />
           <div>
             <h1>Macro Coach</h1>
-            <p className="tagline">Simulated voice assistant experience · real MCP server</p>
+            <p className="tagline">Your voice-first nutrition coach. Say what you ate; get real numbers back.</p>
           </div>
         </div>
         <div className="status" role="status">
           <span className={`dot ${status}`} aria-hidden="true" />
           {status === "ready" ? "Connected" : status === "connecting" ? "Connecting…" : "Not connected"}
-          {status === "ready" && <span className="pill">{mode === "bedrock" ? "Assistant: Amazon Bedrock" : "Assistant: local intent router"}</span>}
+          {status === "ready" && (
+            <span className="pill" title={mode === "bedrock" ? "Each turn is planned by a model on Amazon Bedrock" : "Bedrock is unavailable, so a local intent router picks the tool"}>
+              {mode === "bedrock" ? `Amazon Bedrock${model ? ` · ${model.replace(/^us./, "")}` : ""}` : "Local intent router"}
+            </span>
+          )}
         </div>
       </header>
+
+      <ol className="pipeline" aria-label="How a request flows">
+        {STEPS.map((step, i) => (
+          <li key={step}>
+            <span className="step-num">{i + 1}</span>
+            {step}
+          </li>
+        ))}
+      </ol>
 
       {status === "error" && (
         <div className="alert" role="alert">
@@ -203,14 +231,32 @@ export function App() {
               </div>
             )}
             {turns.map((t) => (
-              <p key={t.id} className={`bubble ${t.who}`}>
-                <span className="sr-only">{t.who === "user" ? "You said:" : "Coach:"}</span>
-                {t.text}
-              </p>
+              <div key={t.id} className={`turn ${t.who}`}>
+                <p className={`bubble ${t.who}`}>
+                  <span className="sr-only">{t.who === "user" ? "You said:" : "Coach:"}</span>
+                  {t.text}
+                </p>
+                {t.card && (
+                  <figure className="card-wrap">
+                    <AppFrame html={t.card.html} result={t.card.result} title={`${t.card.tool} card`} />
+                    <figcaption>MCP App rendered from ui://macro-coach/card.html</figcaption>
+                  </figure>
+                )}
+              </div>
             ))}
             {busy && <p className="bubble assistant thinking">Thinking…</p>}
             <div ref={transcriptEnd} />
           </div>
+
+          {turns.length > 0 && (
+            <div className="quick" aria-label="Suggestions">
+              {SAMPLES.map((s) => (
+                <button key={s} type="button" className="quick-chip" disabled={status !== "ready" || busy} onClick={() => void submit(s)}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
 
           <form
             className="composer"
@@ -266,7 +312,8 @@ export function App() {
       </main>
 
       <footer className="foot">
-        Nutrition data: USDA FoodData Central. MCP server: <code>{config?.mcpUrl}</code>
+        Built for the Alexa+ track of the Build, Ship, Shape hackathon. Nutrition data: USDA FoodData Central. MCP server:{" "}
+        <code>{config?.mcpUrl}</code> · <a href="https://github.com/Wilhelmvsop/Macro-Coach">Source on GitHub</a>
       </footer>
     </div>
   );

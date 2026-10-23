@@ -20,6 +20,9 @@ export interface ToolTrace {
   text?: string;
   result?: unknown;
   ms?: number;
+  /** MCP Apps view linked to this tool, if any. */
+  ui?: string;
+  raw?: unknown;
 }
 
 export interface AgentEvents {
@@ -39,6 +42,8 @@ const MAX_STEPS = 6;
 export class Agent {
   private history: ConverseMessage[] = [];
   mode: AgentMode = "bedrock";
+  /** Bedrock model that answered the last turn. */
+  model: string | undefined;
 
   constructor(private readonly mcp: McpConnection, private readonly apiBase: string, private readonly token: string) {}
 
@@ -47,12 +52,13 @@ export class Agent {
   }
 
   private async callTool(name: string, args: Record<string, unknown>, events: AgentEvents): Promise<ToolTrace> {
-    const trace: ToolTrace = { id: crypto.randomUUID(), name, args, status: "running" };
+    const ui = this.mcp.uiFor(name);
+    const trace: ToolTrace = { id: crypto.randomUUID(), name, args, status: "running", ...(ui ? { ui } : {}) };
     events.onToolStart(trace);
     const started = performance.now();
     try {
       const out = await this.mcp.callTool(name, args);
-      const done: ToolTrace = { ...trace, status: out.isError ? "error" : "ok", text: out.text, result: out.structured, ms: Math.round(performance.now() - started) };
+      const done: ToolTrace = { ...trace, status: out.isError ? "error" : "ok", text: out.text, result: out.structured, raw: out.raw, ms: Math.round(performance.now() - started) };
       events.onToolEnd(done);
       return done;
     } catch (err) {
@@ -62,33 +68,39 @@ export class Agent {
     }
   }
 
-  private async converse(messages: ConverseMessage[]): Promise<{ message: ConverseMessage; stopReason: string }> {
+  private async converse(messages: ConverseMessage[]): Promise<{ message: ConverseMessage; stopReason: string; model?: string }> {
     const res = await fetch(`${this.apiBase}/agent/converse`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${this.token}` },
       body: JSON.stringify({ messages, tools: this.mcp.tools }),
     });
     if (!res.ok) throw new Error(`assistant unavailable (${res.status})`);
-    return (await res.json()) as { message: ConverseMessage; stopReason: string };
+    return (await res.json()) as { message: ConverseMessage; stopReason: string; model?: string };
   }
 
   /** Handles one user utterance and returns the spoken reply. */
   async ask(text: string, events: AgentEvents): Promise<string> {
-    if (this.mode === "local") return this.askLocal(text, events);
     const messages: ConverseMessage[] = [...this.history, { role: "user", content: [{ text }] }];
+    // Tool results are already short and speakable; use the latest one if the model ends without text.
+    let lastToolText = "";
     try {
       for (let step = 0; step < MAX_STEPS; step++) {
-        const { message, stopReason } = await this.converse(messages);
+        const { message, stopReason, model } = await this.converse(messages);
+        this.model = model;
+        this.mode = "bedrock";
+        // Bedrock rejects empty assistant turns in history, so never keep one.
+        if (message.content.length === 0) message.content = [{ text: lastToolText || "Okay." }];
         messages.push(message);
         const uses = message.content.flatMap((b) => ("toolUse" in b ? [b.toolUse] : []));
         if (stopReason !== "tool_use" || uses.length === 0) {
           this.history = messages.slice(-20);
           const reply = message.content.flatMap((b) => ("text" in b ? [b.text] : [])).join(" ").trim();
-          return reply || "Okay.";
+          return reply || lastToolText || "Okay.";
         }
         const results: Block[] = [];
         for (const u of uses) {
           const t = await this.callTool(u.name, u.input ?? {}, events);
+          if (t.text) lastToolText = t.text;
           results.push({
             toolResult: {
               toolUseId: u.toolUseId,
@@ -101,7 +113,7 @@ export class Agent {
       }
       return "Sorry, that took too many steps. Please try again.";
     } catch {
-      // Bedrock is not reachable (for example a new AWS account under verification); keep the demo going.
+      // Bedrock is not reachable for this turn; keep the demo going and try Bedrock again next turn.
       this.mode = "local";
       return this.askLocal(text, events);
     }

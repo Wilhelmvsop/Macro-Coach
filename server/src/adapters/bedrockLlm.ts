@@ -22,7 +22,8 @@ const SuggestSchema = z.object({
     z.object({
       name: z.string(),
       description: z.string(),
-      ingredients: z.array(z.object({ food: z.string(), search_query: z.string(), grams: z.number().positive() })).min(1),
+      // Some models occasionally omit ingredients; such meals are dropped below rather than failing the call.
+      ingredients: z.array(z.object({ food: z.string(), search_query: z.string(), grams: z.number().positive() })).default([]),
     }),
   ),
 });
@@ -171,7 +172,9 @@ export class BedrockLlm implements Llm {
       number_of_meals: req.count,
     });
     const raw = SuggestSchema.parse(await this.callTool(SUGGEST_SYSTEM, prompt, SUGGEST_TOOL));
-    return raw.meals.slice(0, req.count).map((m) => ({
+    const usable = raw.meals.filter((m) => m.ingredients.length > 0);
+    if (usable.length === 0) throw new Error("Model proposed meals without ingredients");
+    return usable.slice(0, req.count).map((m) => ({
       name: m.name,
       description: m.description,
       ingredients: m.ingredients.map((i) => ({ food: i.food, searchQuery: i.search_query, grams: i.grams })),

@@ -531,3 +531,119 @@ h2 {
 .bubble {
   overflow-wrap: anywhere;
 }
+
+/* Request pipeline strip */
+.pipeline {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  margin: 0 0 16px;
+}
+
+.pipeline li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px 6px 6px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.step-num {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--panel-2);
+  color: var(--text);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+/* Turns with optional MCP App card */
+.turn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.turn.user {
+  align-items: flex-end;
+}
+
+.turn.assistant {
+  align-items: flex-start;
+}
+
+.card-wrap {
+  margin: 0;
+  width: min(100%, 520px);
+}
+
+.card-wrap figcaption {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.app-frame {
+  width: 100%;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  display: block;
+}
+
+/* Quick suggestion chips under the transcript */
+.quick {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 10px;
+  scrollbar-width: thin;
+}
+
+.quick-chip {
+  flex: none;
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.quick-chip:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.quick-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.panel {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+}
+
+.top {
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  background: linear-gradient(120deg, rgba(34, 197, 94, 0.14), rgba(56, 189, 248, 0.1) 60%, transparent);
+  border: 1px solid var(--border);
+}
+
+.foot a {
+  color: var(--protein);
+}
