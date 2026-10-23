@@ -93,6 +93,12 @@ export class Agent {
         messages.push(message);
         const uses = message.content.flatMap((b) => ("toolUse" in b ? [b.toolUse] : []));
         if (stopReason !== "tool_use" || uses.length === 0) {
+          // Weaker models sometimes answer a clear nutrition question without calling a tool.
+          // If nothing was called yet and the router recognizes a specific intent, use it instead.
+          if (step === 0 && !lastToolText) {
+            const routed = routeUtterance(text);
+            if (routed.name !== "log_meal") return this.askLocal(text, events);
+          }
           this.history = messages.slice(-20);
           const reply = message.content.flatMap((b) => ("text" in b ? [b.text] : [])).join(" ").trim();
           return reply || lastToolText || "Okay.";

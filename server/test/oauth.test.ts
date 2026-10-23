@@ -59,7 +59,10 @@ describe("signed tokens", () => {
     expect(verify(SECRET, t, "access")?.sub).toBe("u1");
     expect(verify(SECRET, t, "refresh")).toBeUndefined();
     expect(verify("other", t, "access")).toBeUndefined();
-    expect(verify(SECRET, t.replace(/.$/, (c) => (c === "A" ? "B" : "A")), "access")).toBeUndefined();
+    // Flip a character in the middle of the signature (the last base64url character can carry padding bits only).
+    const i = t.length - 10;
+    const tampered = t.slice(0, i) + (t[i] === "A" ? "B" : "A") + t.slice(i + 1);
+    expect(verify(SECRET, tampered, "access")).toBeUndefined();
     expect(verify(SECRET, t, "access", Date.now() + 120_000)).toBeUndefined();
   });
 });
