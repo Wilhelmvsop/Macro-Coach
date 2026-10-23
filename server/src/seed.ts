@@ -41,6 +41,10 @@ export async function seedDemoUser(deps: Deps, opts: SeedOptions): Promise<{ use
   await deps.store.putProfile(user.id, { weightKg: 75, heightCm: 178, age: 30, sex: "male", activity: "moderate" });
 
   const today = localDate(deps.now(), user.timezone);
+  // Remove earlier seeded history so nightly reseeds replace it instead of piling up.
+  // Entries the user logged themselves are kept.
+  const old = await deps.store.listEntries(user.id, addDays(today, -60), addDays(today, -1));
+  for (const e of old.filter((x) => x.id.startsWith("seed-"))) await deps.store.deleteEntry(user.id, e.id);
   const entries: LogEntry[] = [];
   for (const [i, plan] of WEEK.entries()) {
     const date = addDays(today, i - WEEK.length);
