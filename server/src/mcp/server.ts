@@ -5,6 +5,7 @@ import { errorFields, log } from "../logger.js";
 import { GENERIC_ERROR, UserFacingError } from "../tools/errors.js";
 import * as h from "../tools/handlers.js";
 import type { ToolContext, ToolResult } from "../tools/handlers.js";
+import { UI_HTML, UI_MIME_TYPE, UI_RESOURCE_URI, UI_TOOL_META } from "./ui.js";
 
 export const SERVER_INFO = { name: "macro-coach", version: "0.1.0" };
 
@@ -43,6 +44,7 @@ export function createMcpServer(ctx: ToolContext): McpServer {
         "and the remaining daily budget. If the amount or food is ambiguous it logs nothing and returns a question to ask the user.",
       inputSchema: h.logMealInput,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+      _meta: UI_TOOL_META,
     },
     (args) => run("log_meal", ctx, () => h.logMeal(ctx, args)),
   );
@@ -67,6 +69,7 @@ export function createMcpServer(ctx: ToolContext): McpServer {
       description: "Calories, protein, carbs, fat and fiber eaten versus the user's targets for one day (default today), with meals listed.",
       inputSchema: h.dailySummaryInput,
       annotations: { readOnlyHint: true, openWorldHint: false },
+      _meta: UI_TOOL_META,
     },
     (args) => run("get_daily_summary", ctx, () => h.getDailySummary(ctx, args)),
   );
@@ -93,6 +96,7 @@ export function createMcpServer(ctx: ToolContext): McpServer {
         "dietary constraints. Macros are estimated from USDA FoodData Central data. Use for 'what should I eat for dinner?'.",
       inputSchema: h.suggestMealInput,
       annotations: { readOnlyHint: true, openWorldHint: true },
+      _meta: UI_TOOL_META,
     },
     (args) => run("suggest_meal", ctx, () => h.suggestMeal(ctx, args)),
   );
@@ -119,6 +123,7 @@ export function createMcpServer(ctx: ToolContext): McpServer {
         "Use for 'how did I do this week?'.",
       inputSchema: h.weeklyReportInput,
       annotations: { readOnlyHint: true, openWorldHint: false },
+      _meta: UI_TOOL_META,
     },
     (args) => run("get_weekly_report", ctx, () => h.getWeeklyReport(ctx, args)),
   );
@@ -148,6 +153,16 @@ export function createMcpServer(ctx: ToolContext): McpServer {
       const r = await h.getDailySummary(ctx, {});
       return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify({ speech: r.speech, ...r.data }) }] };
     },
+  );
+
+  // MCP Apps view: hosts that support io.modelcontextprotocol/ui render it beside the tool result.
+  server.registerResource(
+    "macro-coach-card",
+    UI_RESOURCE_URI,
+    { title: "Macro Coach card", description: "Interactive card for daily rings, weekly trends and meal ideas.", mimeType: UI_MIME_TYPE },
+    async (uri) => ({
+      contents: [{ uri: uri.href, mimeType: UI_MIME_TYPE, text: UI_HTML, _meta: { ui: { prefersBorder: false } } }],
+    }),
   );
 
   server.registerPrompt(

@@ -119,6 +119,17 @@ describe("MCP server over Streamable HTTP", () => {
     expect(body.speech).toMatch(/So far today/);
   });
 
+  it("links visual tools to an MCP Apps card", async () => {
+    const { tools } = await client.listTools();
+    const withUi = tools.filter((t) => (t._meta as { ui?: { resourceUri?: string } } | undefined)?.ui?.resourceUri === "ui://macro-coach/card.html");
+    expect(withUi.map((t) => t.name).sort()).toEqual(["get_daily_summary", "get_weekly_report", "log_meal", "suggest_meal"]);
+    const res = await client.readResource({ uri: "ui://macro-coach/card.html" });
+    const card = res.contents[0] as { mimeType: string; text: string };
+    expect(card.mimeType).toBe("text/html;profile=mcp-app");
+    expect(card.text).toContain("ui/initialize");
+    expect(card.text).toContain("ui/notifications/tool-result");
+  });
+
   it("exposes the daily_checkin prompt", async () => {
     const { prompts } = await client.listPrompts();
     expect(prompts.map((p) => p.name)).toContain("daily_checkin");

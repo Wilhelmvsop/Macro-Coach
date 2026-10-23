@@ -1,4 +1,5 @@
-import { BedrockRuntimeClient, ConverseCommand, type Message, type Tool } from "@aws-sdk/client-bedrock-runtime";
+import type { Message, Tool } from "@aws-sdk/client-bedrock-runtime";
+import { BedrockModelChain } from "../adapters/bedrockModels.js";
 import { z } from "zod";
 
 /**
@@ -25,30 +26,34 @@ export const AgentLlmRequest = z.object({
 });
 
 export interface AgentLlm {
-  converse(req: z.infer<typeof AgentLlmRequest>): Promise<{ message: Message; stopReason: string }>;
+  converse(req: z.infer<typeof AgentLlmRequest>): Promise<{ message: Message; stopReason: string; model?: string }>;
 }
 
 /** One Bedrock Converse turn for the simulator's agent loop. */
 export class BedrockAgentLlm implements AgentLlm {
-  private readonly client: BedrockRuntimeClient;
-  constructor(private readonly modelId: string, region: string) {
-    this.client = new BedrockRuntimeClient({ region });
+  private readonly models: BedrockModelChain;
+  constructor(modelIds: string[], region: string) {
+    this.models = new BedrockModelChain(modelIds, region);
   }
 
   async converse(req: z.infer<typeof AgentLlmRequest>) {
     const tools: Tool[] = req.tools.map((t) => ({
       toolSpec: { name: t.name, description: t.description, inputSchema: { json: t.inputSchema as Record<string, never> } },
     }));
-    const res = await this.client.send(
-      new ConverseCommand({
-        modelId: this.modelId,
-        system: [{ text: AGENT_SYSTEM }],
-        messages: req.messages as unknown as Message[],
-        ...(tools.length > 0 ? { toolConfig: { tools, toolChoice: { auto: {} } } } : {}),
-        inferenceConfig: { maxTokens: 2000 },
-      }),
-    );
-    const message = res.output?.message ?? { role: "assistant", content: [{ text: "Sorry, I didn't get that." }] };
-    return { message, stopReason: res.stopReason ?? "end_turn" };
+    const res = await this.models.converse({
+      system: [{ text: AGENT_SYSTEM }],
+      messages: req.messages as unknown as Message[],
+      ...(tools.length > 0 ? { toolConfig: { tools, toolChoice: { auto: {} } } } : {}),
+      inferenceConfig: { maxTokens: 2000 },
+    });
+    const raw = res.output?.message ?? { role: "assistant", content: [{ text: "Sorry, I didn't get that." }] };
+    // Some models (e.g. Amazon Nova) emit <thinking> blocks in text; never speak them.
+    const message: Message = {
+      ...raw,
+      content: (raw.content ?? [])
+        .map((b) => (b.text !== undefined ? { ...b, text: b.text.replace(/<thinking>[\s\S]*?<\/thinking>/g, "").trim() } : b))
+        .filter((b) => b.text === undefined || b.text.length > 0),
+    } as Message;
+    return { message, stopReason: res.stopReason ?? "end_turn", model: res.modelId };
   }
 }

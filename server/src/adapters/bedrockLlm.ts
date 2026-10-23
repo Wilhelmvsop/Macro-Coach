@@ -1,9 +1,5 @@
-import {
-  BedrockRuntimeClient,
-  ConverseCommand,
-  type ContentBlock,
-  type Tool,
-} from "@aws-sdk/client-bedrock-runtime";
+import type { ContentBlock, Tool } from "@aws-sdk/client-bedrock-runtime";
+import { BedrockModelChain } from "./bedrockModels.js";
 import { z } from "zod";
 import { errorFields, log } from "../logger.js";
 import type { Llm, MealIdeaDraft, ParseResult, SuggestRequest } from "../ports.js";
@@ -124,28 +120,25 @@ const SUGGEST_SYSTEM =
   "Propose simple, realistic meals that fit the remaining macro budget, prefer the user's available ingredients, " +
   "and respect dietary constraints. Give each ingredient a weight in grams. Do not state nutrition numbers; they are computed from USDA data.";
 
-/** Amazon Bedrock (Claude via the Converse API) implementation of the Llm port. */
+/** Amazon Bedrock (Converse API, Claude first) implementation of the Llm port. */
 export class BedrockLlm implements Llm {
-  private readonly client: BedrockRuntimeClient;
+  private readonly models: BedrockModelChain;
 
-  constructor(private readonly modelId: string, region: string) {
-    this.client = new BedrockRuntimeClient({ region });
+  constructor(modelIds: string[], region: string) {
+    this.models = new BedrockModelChain(modelIds, region);
   }
 
   private async callTool(system: string, user: string, tool: Tool): Promise<unknown> {
     const started = Date.now();
-    const res = await this.client.send(
-      new ConverseCommand({
-        modelId: this.modelId,
-        system: [{ text: system }],
-        messages: [{ role: "user", content: [{ text: user }] }],
-        toolConfig: { tools: [tool], toolChoice: { auto: {} } },
-        inferenceConfig: { maxTokens: 4000 },
-      }),
-    );
+    const res = await this.models.converse({
+      system: [{ text: system }],
+      messages: [{ role: "user", content: [{ text: user }] }],
+      toolConfig: { tools: [tool], toolChoice: { auto: {} } },
+      inferenceConfig: { maxTokens: 4000 },
+    });
     const content: ContentBlock[] = res.output?.message?.content ?? [];
     log.info("bedrock.converse", {
-      model: this.modelId,
+      model: res.modelId,
       tool: tool.toolSpec?.name,
       ms: Date.now() - started,
       stopReason: res.stopReason,

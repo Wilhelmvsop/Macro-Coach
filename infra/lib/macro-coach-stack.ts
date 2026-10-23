@@ -25,7 +25,7 @@ const simulatorDist = path.join(here, "..", "..", "simulator", "dist");
 export interface MacroCoachStackProps extends StackProps {
   fdcApiKey: string;
   demoToken: string;
-  bedrockModelId: string;
+  bedrockModelIds: string;
 }
 
 export class MacroCoachStack extends Stack {
@@ -52,7 +52,7 @@ export class MacroCoachStack extends Stack {
       environment: {
         TABLE_NAME: table.tableName,
         FDC_API_KEY: props.fdcApiKey,
-        BEDROCK_MODEL_ID: props.bedrockModelId,
+        BEDROCK_MODEL_IDS: props.bedrockModelIds,
         DEMO_TOKEN: props.demoToken,
         NODE_OPTIONS: "--enable-source-maps",
       },
