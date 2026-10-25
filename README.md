@@ -1,5 +1,9 @@
 # Macro Coach
 
+[![Watch the Macro Coach demo (1:44)](docs/media/macro-coach-demo-thumbnail.jpg)](docs/media/macro-coach-demo.mp4)
+
+▶️ **[Watch the demo video (1:44, with voiceover)](docs/media/macro-coach-demo.mp4)**
+
 A voice-first nutrition coach for Alexa+. Tell it what you ate; Macro Coach logs it, computes calories and macros from USDA FoodData Central, tracks you against your daily targets and suggests what to eat next. Under the hood it is a self-hosted MCP server (spec **2025-11-25**, Streamable HTTP) on AWS.
 
 > This project is new and was built during the Build, Ship, Shape: Amazon Developer Hackathon submission window (October 2026).
